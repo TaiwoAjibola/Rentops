@@ -62,7 +62,6 @@ export async function createSession(userId: string, context?: { ipAddress?: stri
     path: "/",
     expires: expiresAt,
   });
-
   await prisma.user.update({ where: { id: userId }, data: { lastLoginAt: new Date() } });
 
   return token;

@@ -101,7 +101,7 @@ const reviews: Row[] = [
   { id:id('rev',1), propertyId:id('prop',1), reservationId:null, userId:id('usr',2), overallRating:5, cleanliness:5, accuracy:5, communication:5, locationRating:5, value:5, checkInRating:5, title:'Excellent stay', body:'Clean, comfortable, and great location.', status:'PUBLISHED', partnerResponse:null, respondedAt:null, respondedById:null, moderationNote:null, moderatedById:null, publishedAt:now, createdAt:now, updatedAt:now },
 ];
 
-const store: Store = {
+const seedStore: Store = {
   propertyCategory: categories,
   amenity: amenities,
   location: locations,
@@ -150,6 +150,9 @@ const store: Store = {
   customerProfile: [],
   propertyFee: [],
 };
+const g = globalThis as unknown as { __rentopsDemoStore?: Store };
+const store: Store = g.__rentopsDemoStore ?? seedStore;
+g.__rentopsDemoStore = store;
 
 function getCollection(model: string): Row[] {
   if (!store[model]) store[model] = [];
