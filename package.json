@@ -2,10 +2,10 @@
   "name": "rentops",
   "version": "0.1.0",
   "private": true,
-  "description": "RentOps — premium property discovery, accommodation booking and leasing marketplace",
+  "description": "RentOps \u2014 premium property discovery, accommodation booking and leasing marketplace",
   "scripts": {
     "dev": "next dev -p 3000",
-    "build": "prisma generate && next build",
+    "build": "DATABASE_URL=\"postgresql://demo:demo@localhost:5432/demo\" prisma generate && next build",
     "start": "next start -p 3000",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
@@ -16,7 +16,8 @@
     "db:demo": "tsx prisma/seed-demo.ts",
     "db:studio": "prisma studio",
     "db:reset": "prisma migrate reset --force",
-    "setup": "prisma generate && prisma migrate deploy && tsx prisma/seed.ts"
+    "setup": "prisma generate && prisma migrate deploy && tsx prisma/seed.ts",
+    "postinstall": "DATABASE_URL=\"postgresql://demo:demo@localhost:5432/demo\" prisma generate"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts && tsx prisma/seed-demo.ts"
