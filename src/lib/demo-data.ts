@@ -46,3 +46,13 @@ export const partnerMembers = [
   { id:id('pm',1), partnerId:id('prt',1), userId:id('usr',4), role:'OWNER', permissions:null, jobTitle:'Owner', status:'ACTIVE', invitedById:null, createdAt:DEMO_NOW, updatedAt:DEMO_NOW },
   { id:id('pm',2), partnerId:id('prt',2), userId:id('usr',5), role:'OWNER', permissions:null, jobTitle:'Owner', status:'ACTIVE', invitedById:null, createdAt:DEMO_NOW, updatedAt:DEMO_NOW },
 ];
+
+export const unitMedia = [
+  { id:id('um',1), unitId:id('unit',1), type:'IMAGE', url:'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?auto=format&fit=crop&w=1400&q=80', caption:'Bedroom', publicId:null, mimeType:null, size:null, width:1400, height:933, sortOrder:0, meta:null, createdAt:DEMO_NOW },
+  { id:id('um',2), unitId:id('unit',1), type:'IMAGE', url:'https://images.unsplash.com/photo-1618773928121-c32242e63f39?auto=format&fit=crop&w=1400&q=80', caption:'Bathroom', publicId:null, mimeType:null, size:null, width:1400, height:933, sortOrder:1, meta:null, createdAt:DEMO_NOW },
+  { id:id('um',3), unitId:id('unit',1), type:'VIRTUAL_TOUR_360', url:'https://pannellum.org/images/alma.jpg', caption:'360° room tour', publicId:null, mimeType:null, size:null, width:null, height:null, sortOrder:2, meta:{ provider:'pannellum', scenes:[{ id:'s1', name:'Room view', panorama:'https://pannellum.org/images/alma.jpg', hotspots:[{ yaw:20, pitch:0, to:'s2', label:'Bathroom' }] }, { id:'s2', name:'Bathroom', panorama:'https://pannellum.org/images/cerro-toco-0.jpg', hotspots:[{ yaw:-20, pitch:0, to:'s1', label:'Back to room' }] }] }, createdAt:DEMO_NOW },
+  { id:id('um',4), unitId:id('unit',2), type:'IMAGE', url:'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1400&q=80', caption:'Living room', publicId:null, mimeType:null, size:null, width:1400, height:933, sortOrder:0, meta:null, createdAt:DEMO_NOW },
+  { id:id('um',5), unitId:id('unit',2), type:'IMAGE', url:'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=1400&q=80', caption:'Bedroom', publicId:null, mimeType:null, size:null, width:1400, height:933, sortOrder:1, meta:null, createdAt:DEMO_NOW },
+  { id:id('um',6), unitId:id('unit',3), type:'IMAGE', url:'https://images.unsplash.com/photo-1484154218962-a197022b5858?auto=format&fit=crop&w=1400&q=80', caption:'Kitchen', publicId:null, mimeType:null, size:null, width:1400, height:933, sortOrder:0, meta:null, createdAt:DEMO_NOW },
+  { id:id('um',7), unitId:id('unit',3), type:'IMAGE', url:'https://images.unsplash.com/photo-1493809842364-78817add7ffb?auto=format&fit=crop&w=1400&q=80', caption:'Bedroom', publicId:null, mimeType:null, size:null, width:1400, height:933, sortOrder:1, meta:null, createdAt:DEMO_NOW },
+];

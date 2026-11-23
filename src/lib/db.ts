@@ -1,5 +1,5 @@
 import { PrismaClient } from "@prisma/client";
-import { categories, amenities, locations, partners, users, partnerMembers, DEMO_NOW, id } from "@/lib/demo-data";
+import { categories, amenities, locations, partners, users, partnerMembers, unitMedia as demoUnitMedia, DEMO_NOW, id } from "@/lib/demo-data";
 
 type Row = Record<string, any>;
 type Store = Record<string, Row[]>;
@@ -112,7 +112,7 @@ const seedStore: Store = {
   unit: units,
   unitRate: unitRates,
   propertyMedia,
-  unitMedia: [],
+  unitMedia: demoUnitMedia,
   propertyAmenity: propertyAmenities,
   propertyCategoryAssignment: [],
   roomCategory: [],

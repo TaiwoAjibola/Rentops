@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, createHmac, randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
@@ -23,6 +23,7 @@ export const SESSION_COOKIE = "rentops_session";
 export const ACTIVE_PARTNER_COOKIE = "rentops_partner";
 
 const SESSION_TTL_HOURS = Number(process.env.SESSION_TTL_HOURS ?? 720);
+const SESSION_SECRET = process.env.SESSION_SECRET ?? "rentops-demo-session-secret";
 
 // -----------------------------------------------------------------------------
 // Passwords & tokens
@@ -36,23 +37,34 @@ export function hashToken(token: string) {
   return createHash("sha256").update(token).digest("hex");
 }
 
+function signSessionValue(value: string) {
+  return createHmac("sha256", SESSION_SECRET).update(value).digest("base64url");
+}
+
+function createSessionToken(userId: string, expiresAt: Date) {
+  const payload = `${userId}.${expiresAt.getTime()}`;
+  return `${payload}.${signSessionValue(payload)}`;
+}
+
+function readSessionToken(token: string): { userId: string; expiresAt: Date } | null {
+  const [userId, exp, sig, ...rest] = token.split(".");
+  if (!userId || !exp || !sig || rest.length > 0) return null;
+  const payload = `${userId}.${exp}`;
+  if (signSessionValue(payload) !== sig) return null;
+  const ms = Number(exp);
+  if (!Number.isFinite(ms)) return null;
+  const expiresAt = new Date(ms);
+  if (expiresAt < new Date()) return null;
+  return { userId, expiresAt };
+}
+
 // -----------------------------------------------------------------------------
 // Session lifecycle
 // -----------------------------------------------------------------------------
 
-export async function createSession(userId: string, context?: { ipAddress?: string | null; userAgent?: string | null }) {
-  const token = generateToken();
+export async function createSession(userId: string, _context?: { ipAddress?: string | null; userAgent?: string | null }) {
   const expiresAt = new Date(Date.now() + SESSION_TTL_HOURS * 3_600_000);
-
-  await prisma.session.create({
-    data: {
-      tokenHash: hashToken(token),
-      userId,
-      expiresAt,
-      ipAddress: context?.ipAddress ?? null,
-      userAgent: context?.userAgent ?? null,
-    },
-  });
+  const token = createSessionToken(userId, expiresAt);
 
   const store = await cookies();
   store.set(SESSION_COOKIE, token, {
@@ -62,18 +74,19 @@ export async function createSession(userId: string, context?: { ipAddress?: stri
     path: "/",
     expires: expiresAt,
   });
-  await prisma.user.update({ where: { id: userId }, data: { lastLoginAt: new Date() } });
+  try {
+    await prisma.user.update({ where: { id: userId }, data: { lastLoginAt: new Date() } });
+  } catch {
+    // Demo/no-DB mode: best effort.
+  }
 
   return token;
 }
 
 export async function destroySession() {
   const store = await cookies();
-  const token = store.get(SESSION_COOKIE)?.value;
-  if (token) {
-    await prisma.session.deleteMany({ where: { tokenHash: hashToken(token) } });
-  }
   store.delete(SESSION_COOKIE);
+  store.delete(ACTIVE_PARTNER_COOKIE);
 }
 
 export type SessionUser = User;
@@ -83,15 +96,12 @@ export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
   const token = store.get(SESSION_COOKIE)?.value;
   if (!token) return null;
 
-  const session = await prisma.session.findUnique({
-    where: { tokenHash: hashToken(token) },
-    include: { user: true },
-  });
+  const parsed = readSessionToken(token);
+  if (!parsed) return null;
 
-  if (!session || session.revokedAt || session.expiresAt < new Date()) return null;
-  if (session.user.status !== "ACTIVE") return null;
-
-  return session.user;
+  const user = await prisma.user.findUnique({ where: { id: parsed.userId } });
+  if (!user || (user as any).status !== "ACTIVE") return null;
+  return user as SessionUser;
 });
 
 // -----------------------------------------------------------------------------
