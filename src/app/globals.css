@@ -1,0 +1,202 @@
+@import "tailwindcss";
+
+/* ==========================================================================
+   RentOps design tokens
+   Palette: deep emerald (trust, growth) + warm neutral surfaces +
+   brushed gold accent (verification & premium signals).
+   ========================================================================== */
+
+@theme {
+  --font-sans: var(--font-rentops-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display: var(--font-rentops-display), ui-serif, Georgia, "Times New Roman", serif;
+  --font-brand: var(--font-rentops-brand), var(--font-rentops-display), ui-serif, Georgia, serif;
+
+  /* Brand — deep emerald */
+  --color-brand-50: #eff8f4;
+  --color-brand-100: #d6ede4;
+  --color-brand-200: #aedccb;
+  --color-brand-300: #7cc4ab;
+  --color-brand-400: #46a586;
+  --color-brand-500: #1f8767;
+  --color-brand-600: #146b53;
+  --color-brand-700: #10543f;
+  --color-brand-800: #0e4233;
+  --color-brand-900: #0c372b;
+  --color-brand-950: #062018;
+
+  /* Accent — brushed gold */
+  --color-gold-50: #fbf7ec;
+  --color-gold-100: #f5ebd2;
+  --color-gold-200: #e9d5a3;
+  --color-gold-300: #dbb96b;
+  --color-gold-400: #cda047;
+  --color-gold-500: #c08b36;
+  --color-gold-600: #a56d2c;
+  --color-gold-700: #835327;
+  --color-gold-800: #6c4425;
+  --color-gold-900: #5c3923;
+
+  /* Ink — warm neutral with a cool lean */
+  --color-ink-50: #f7f7f6;
+  --color-ink-100: #eeedea;
+  --color-ink-200: #dcdad4;
+  --color-ink-300: #c2bfb6;
+  --color-ink-400: #a19d92;
+  --color-ink-500: #868277;
+  --color-ink-600: #6a665e;
+  --color-ink-700: #514e48;
+  --color-ink-800: #33312e;
+  --color-ink-900: #1a1a18;
+  --color-ink-950: #0d0e0d;
+
+  --color-surface: #ffffff;
+  --color-canvas: #faf9f7;
+  --color-line: #e8e5de;
+  --color-line-strong: #d8d4cb;
+
+  --color-success: #17795a;
+  --color-success-soft: #e7f5ef;
+  --color-warning: #a86c12;
+  --color-warning-soft: #fdf3e2;
+  --color-danger: #b42318;
+  --color-danger-soft: #fdeceb;
+  --color-info: #1c6ea4;
+  --color-info-soft: #e8f2fa;
+
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-2xl: 28px;
+
+  --shadow-xs: 0 1px 2px rgba(16, 24, 20, 0.04);
+  --shadow-sm: 0 1px 3px rgba(16, 24, 20, 0.06), 0 1px 2px rgba(16, 24, 20, 0.04);
+  --shadow-md: 0 6px 20px -6px rgba(16, 24, 20, 0.12), 0 2px 6px rgba(16, 24, 20, 0.05);
+  --shadow-lg: 0 24px 48px -18px rgba(16, 24, 20, 0.22), 0 6px 16px rgba(16, 24, 20, 0.06);
+  --shadow-xl: 0 40px 80px -28px rgba(16, 24, 20, 0.3);
+
+  --ease-premium: cubic-bezier(0.22, 1, 0.36, 1);
+
+  --spacing-safe: 1rem;
+}
+
+@layer base {
+  * {
+    border-color: var(--color-line);
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--color-canvas);
+    color: var(--color-ink-900);
+    font-family: var(--font-sans);
+    font-feature-settings: "cv11", "ss01";
+    letter-spacing: -0.011em;
+  }
+
+  h1,
+  h2,
+  h3,
+  .font-display {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+  }
+
+  /* Brand wordmark — Cinzel capitals, letter-spaced, never italic. */
+  .font-brand {
+    font-family: var(--font-brand);
+    letter-spacing: 0.06em;
+    font-style: normal;
+  }
+
+  ::selection {
+    background-color: var(--color-brand-100);
+    color: var(--color-brand-900);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-brand-500);
+    outline-offset: 2px;
+    border-radius: var(--radius-xs);
+  }
+
+  input,
+  textarea,
+  select {
+    font-family: inherit;
+  }
+}
+
+@layer utilities {
+  .container-page {
+    width: 100%;
+    margin-inline: auto;
+    max-width: 1280px;
+    padding-inline: 1rem;
+  }
+
+  @media (min-width: 768px) {
+    .container-page {
+      padding-inline: 2rem;
+    }
+  }
+
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .hairline {
+    border-width: 1px;
+    border-color: var(--color-line);
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .grid-lines {
+    background-image:
+      linear-gradient(to right, rgba(0, 0, 0, 0.03) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(0, 0, 0, 0.03) 1px, transparent 1px);
+    background-size: 64px 64px;
+  }
+}
+
+/* Date inputs: keep the native picker affordance consistent */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.55;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+}
+
+/* Respect reduced-motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

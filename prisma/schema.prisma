@@ -1,0 +1,1455 @@
+// =============================================================================
+// RemTops — Property discovery, accommodation booking & leasing marketplace
+// Data model
+//
+// Money convention: EVERY monetary column is an INTEGER in MINOR UNITS
+// (kobo for NGN). e.g. 150000 = NGN 1,500.00. Columns are suffixed `Minor`
+// or are unambiguously money fields. Use lib/money.ts for conversions and
+// formatting. Never use floats for money.
+//
+// Booking/leasing are the SAME pipeline. Duration is data (checkIn/checkOut),
+// never a separate system.
+// =============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// -----------------------------------------------------------------------------
+// Enums
+// -----------------------------------------------------------------------------
+
+enum SystemRole {
+  CUSTOMER
+  REMTOPS_SUPPORT
+  REMTOPS_OPERATIONS
+  REMTOPS_ADMIN
+  SUPER_ADMIN
+}
+
+enum AccountStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+enum PartnerType {
+  INDIVIDUAL_OWNER
+  SHORTLET_OWNER
+  HOTEL
+  SERVICED_APARTMENT_OPERATOR
+  PROPERTY_MANAGEMENT_COMPANY
+  PROPERTY_DEVELOPER
+  OTHER
+}
+
+enum VerificationStatus {
+  UNVERIFIED
+  PENDING
+  IN_REVIEW
+  VERIFIED
+  REJECTED
+  EXPIRED
+}
+
+enum VerificationType {
+  IDENTITY
+  ADDRESS
+  BACKGROUND
+  BUSINESS
+  OWNERSHIP
+  LOCATION
+  MEDIA
+  INSPECTION
+}
+
+enum MemberStatus {
+  INVITED
+  ACTIVE
+  SUSPENDED
+  REMOVED
+}
+
+enum PartnerMemberRole {
+  OWNER
+  MANAGER
+  FINANCE
+  FRONT_DESK
+  VIEWER
+}
+
+enum PayoutModel {
+  PLATFORM_COLLECTED
+  PARTNER_DIRECT
+  HYBRID
+}
+
+enum PropertyStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  ADDITIONAL_INFO_REQUIRED
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
+enum PropertyVerificationLevel {
+  NONE
+  BASIC
+  VERIFIED
+  PREMIUM
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+  YOUTUBE
+  VIRTUAL_TOUR
+  VIRTUAL_TOUR_360
+  FLOOR_PLAN
+}
+
+enum UnitStatus {
+  ACTIVE
+  MAINTENANCE
+  BLOCKED
+  INACTIVE
+}
+
+enum BlockReason {
+  MAINTENANCE
+  OWNER_USE
+  MANUAL_BOOKING
+  OTHER
+}
+
+enum RateBasis {
+  NIGHTLY
+  WEEKLY
+  MONTHLY
+  ANNUAL
+}
+
+enum FeeKind {
+  TAX
+  CAUTION_DEPOSIT
+  CLEANING
+  SERVICE
+  CUSTOM
+}
+
+enum FeeCalculation {
+  FIXED
+  PERCENTAGE
+  VARIABLE
+}
+
+enum FeeAppliesTo {
+  PER_STAY
+  PER_NIGHT
+  PER_GUEST
+}
+
+enum BookingMode {
+  INSTANT
+  APPROVAL
+}
+
+enum ReservationPaymentOption {
+  PAY_NOW
+  PAY_LATER
+}
+
+enum ReservationStatus {
+  DRAFT
+  PENDING_PAYMENT
+  PENDING_APPROVAL
+  CONFIRMED
+  CHECKED_IN
+  CHECKED_OUT
+  CANCELLED
+  REFUND_PENDING
+  REFUNDED
+  DISPUTED
+  EXPIRED
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REVERSED
+}
+
+enum PaymentDirection {
+  INFLOW
+  OUTFLOW
+}
+
+enum LedgerEntryType {
+  CUSTOMER_PAYMENT
+  PARTNER_PAYABLE
+  PLATFORM_COMMISSION
+  PROCESSING_FEE
+  SERVICE_FEE
+  PARTNER_PAYOUT
+  REFUND
+  CHARGEBACK
+  ADJUSTMENT
+}
+
+enum SettlementStatus {
+  PENDING
+  ON_HOLD
+  SCHEDULED
+  PROCESSING
+  PAID
+  FAILED
+  CANCELLED
+}
+
+enum DisputeStatus {
+  OPEN
+  UNDER_REVIEW
+  AWAITING_PARTNER
+  RESOLVED_CUSTOMER
+  RESOLVED_PARTNER
+  CLOSED
+}
+
+enum ConversationType {
+  BOOKING
+  ENQUIRY
+  INSPECTION
+  SUPPORT
+}
+
+enum ConversationStatus {
+  OPEN
+  PENDING_PARTNER
+  PENDING_CUSTOMER
+  CLOSED
+}
+
+enum TicketStatus {
+  OPEN
+  PENDING
+  RESOLVED
+  CLOSED
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  SMS
+  WHATSAPP
+}
+
+enum NotificationStatus {
+  QUEUED
+  SENT
+  FAILED
+  READ
+}
+
+enum ReviewStatus {
+  PENDING
+  PUBLISHED
+  HIDDEN
+  REMOVED
+}
+
+enum InspectionStatus {
+  REQUESTED
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+  DECLINED
+}
+
+enum ReferralStatus {
+  PENDING
+  QUALIFIED
+  REWARDED
+  REJECTED
+}
+
+enum PromotionType {
+  PERCENTAGE
+  FIXED
+}
+
+enum PromotionScope {
+  ALL
+  PARTNER
+  CATEGORY
+  PROPERTY
+}
+
+// -----------------------------------------------------------------------------
+// Identity, authentication & access control
+// -----------------------------------------------------------------------------
+
+model User {
+  id            String       @id @default(cuid())
+  email         String       @unique
+  phone         String?
+  passwordHash  String
+  firstName     String
+  lastName      String
+  avatarUrl     String?
+  systemRole    SystemRole   @default(CUSTOMER)
+  status        AccountStatus @default(ACTIVE)
+  emailVerifiedAt DateTime?
+  phoneVerifiedAt DateTime?
+  lastLoginAt   DateTime?
+  referralCode  String?      @unique
+
+  referredById String?
+  referredBy   User?   @relation("Referrals", fields: [referredById], references: [id], onDelete: SetNull)
+  referrals    User[]  @relation("Referrals")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sessions            Session[]
+  profile             CustomerProfile?
+  memberships         PartnerMember[]
+  reservations        Reservation[]
+  sentInvitations     PartnerInvitation[] @relation("InvitationInviter")
+  partnerDocuments    PartnerDocument[]
+  notifications       Notification[]
+  notificationPrefs   NotificationPreference?
+  savedProperties     SavedProperty[]
+  verificationRecords VerificationRecord[]
+  reviews             Review[]
+  sentMessages        Message[]  @relation("MessageSender")
+  messageReads        MessageRead[]
+  assignedConversations Conversation[] @relation("ConversationAssignee")
+  customerConversations Conversation[] @relation("ConversationCustomer")
+  assignedTickets     SupportTicket[] @relation("TicketAssignee")
+  customerTickets     SupportTicket[] @relation("TicketCustomer")
+  submittedDisputes   Dispute[]
+  inspectionRequests  InspectionRequest[]
+  referralsGiven      Referral[] @relation("ReferralGiver")
+  referralsReceived   Referral[] @relation("ReferralReceiver")
+  auditLogs           AuditLog[] @relation("AuditActor")
+
+  @@index([systemRole, status])
+}
+
+model Session {
+  id         String   @id @default(cuid())
+  tokenHash  String   @unique
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  ipAddress  String?
+  userAgent  String?
+  lastUsedAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model EmailVerificationToken {
+  id        String   @id @default(cuid())
+  email     String
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([email])
+}
+
+model CustomerProfile {
+  id                    String @id @default(cuid())
+  userId                String @unique
+  user                  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dateOfBirth           DateTime?
+  nationality           String?
+  idType                String?
+  idNumber              String?
+  addressLine           String?
+  city                  String?
+  state                 String?
+  country               String?
+  emergencyContactName  String?
+  emergencyContactPhone String?
+  employmentStatus      String?
+  employerName          String?
+  verificationStatus    VerificationStatus @default(UNVERIFIED)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+// -----------------------------------------------------------------------------
+// Property partners (organisations)
+// -----------------------------------------------------------------------------
+
+model Partner {
+  id                 String       @id @default(cuid())
+  slug               String       @unique
+  type               PartnerType
+  businessName       String
+  legalName          String?
+  registrationNumber String?
+  taxId              String?
+  email              String
+  phone              String
+  whatsapp           String?
+  website            String?
+  description        String?
+  logoUrl            String?
+  addressLine        String?
+  city               String?
+  state              String?
+  country            String       @default("Nigeria")
+
+  verificationStatus VerificationStatus @default(UNVERIFIED)
+  verifiedAt         DateTime?
+  verifiedById       String?
+  status             AccountStatus @default(ACTIVE)
+  onboardingStep     String       @default("ACCOUNT")
+
+  // Commercial configuration
+  payoutModel        PayoutModel  @default(PLATFORM_COLLECTED)
+  commissionRate     Float?       // override of platform default (percent, e.g. 12.5)
+  serviceFeeRate     Float?
+  settlementHoldDays Int?
+  defaultCurrency    String       @default("NGN")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members              PartnerMember[]
+  invitations          PartnerInvitation[]
+  bankAccounts         PartnerBankAccount[]
+  documents            PartnerDocument[]
+  properties           Property[]
+  verificationRecords  VerificationRecord[]
+  settlements          Settlement[]
+  conversations        Conversation[]
+  cancellations        CancellationPolicy[]
+
+  @@index([verificationStatus, status])
+}
+
+model PartnerMember {
+  id          String            @id @default(cuid())
+  partnerId   String
+  partner     Partner           @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role        PartnerMemberRole @default(VIEWER)
+  permissions Json?             // granular capability overrides
+  jobTitle    String?
+  status      MemberStatus      @default(ACTIVE)
+  invitedById String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@unique([partnerId, userId])
+  @@index([userId])
+}
+
+model PartnerInvitation {
+  id          String            @id @default(cuid())
+  partnerId   String
+  partner     Partner           @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  email       String
+  role        PartnerMemberRole @default(VIEWER)
+  permissions Json?
+  tokenHash   String            @unique
+  invitedById String?
+  invitedBy   User?             @relation("InvitationInviter", fields: [invitedById], references: [id], onDelete: SetNull)
+  message     String?
+  status      MemberStatus      @default(INVITED)
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  createdAt   DateTime          @default(now())
+
+  @@index([partnerId, status])
+}
+
+model PartnerBankAccount {
+  id            String   @id @default(cuid())
+  partnerId     String
+  partner       Partner  @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  bankName      String
+  bankCode      String?
+  accountNumber String
+  accountName   String
+  currency      String   @default("NGN")
+  isPrimary     Boolean  @default(false)
+  verifiedAt    DateTime?
+  verifiedById  String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([partnerId])
+}
+
+model PartnerDocument {
+  id           String            @id @default(cuid())
+  partnerId    String
+  partner      Partner           @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  type         VerificationType
+  label        String?
+  fileUrl      String
+  status       VerificationStatus @default(PENDING)
+  notes        String?
+  uploadedById String?
+  uploadedBy   User?             @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  reviewedById String?
+  reviewedAt   DateTime?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  @@index([partnerId, status])
+}
+
+// -----------------------------------------------------------------------------
+// Catalogue: categories, amenities, locations, policies
+// -----------------------------------------------------------------------------
+
+model PropertyCategory {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  icon        String?
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  // Suggested rental windows used only to pre-fill partner forms (never enforced)
+  suggestedRateBasis RateBasis @default(NIGHTLY)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  properties  Property[]
+  promotions  Promotion[]
+}
+
+model Amenity {
+  id       String  @id @default(cuid())
+  name     String
+  slug     String  @unique
+  group    String  @default("General")
+  icon     String?
+  isActive Boolean @default(true)
+
+  properties PropertyAmenity[]
+}
+
+model Location {
+  id        String  @id @default(cuid())
+  name      String // area / neighbourhood e.g. "Lekki Phase 1"
+  city      String
+  state     String?
+  country   String  @default("Nigeria")
+  slug      String  @unique
+  popular   Boolean @default(false)
+  latitude  Float?
+  longitude Float?
+  imageUrl  String?
+  blurb     String?
+  sortOrder Int     @default(0)
+
+  @@index([popular])
+}
+
+model CancellationPolicy {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  partnerId   String?
+  partner     Partner? @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  // [{ "hoursBeforeCheckIn": 168, "refundPercent": 100 }, ...] evaluated most-generous-last
+  rules       Json
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  properties Property[]
+}
+
+model DueDiligencePolicy {
+  id                 String  @id @default(cuid())
+  name               String
+  minDays            Int     // stay length (inclusive) that triggers this policy
+  maxDays            Int?
+  recommendationText String
+  verificationTypes  Json    // ["IDENTITY","BACKGROUND"]
+  mandatory          Boolean @default(false)
+  chargeMinor        Float     @default(0)
+  currency           String  @default("NGN")
+  isActive           Boolean @default(true)
+  sortOrder          Int     @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+// -----------------------------------------------------------------------------
+// Properties
+// -----------------------------------------------------------------------------
+
+model Property {
+  id           String      @id @default(cuid())
+  slug         String      @unique
+  partnerId    String
+  partner      Partner     @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  categoryId   String
+  category     PropertyCategory @relation(fields: [categoryId], references: [id])
+
+  name        String
+  headline    String?
+  description String
+
+  status            PropertyStatus @default(DRAFT)
+  verificationLevel PropertyVerificationLevel @default(NONE)
+  verificationBadge Boolean        @default(false)
+  isActive          Boolean        @default(true)
+
+  // Location
+  addressLine1 String
+  addressLine2 String?
+  area         String?
+  city         String
+  state        String
+  country      String  @default("Nigeria")
+  postalCode   String?
+  latitude     Float?
+  longitude    Float?
+
+  // Contact
+  contactName  String?
+  contactPhone String?
+  contactEmail String?
+
+  // Capacity (property level defaults; units may override)
+  bedrooms    Int   @default(1)
+  bathrooms   Int   @default(1)
+  maxGuests   Int   @default(2)
+  sizeSqm     Float?
+
+  // Policies
+  houseRules           String?
+  cancellationPolicyId String?
+  cancellationPolicy   CancellationPolicy? @relation(fields: [cancellationPolicyId], references: [id], onDelete: SetNull)
+  checkInFrom          String?
+  checkInTo            String?
+  checkOutUntil        String?
+  smokingAllowed       Boolean @default(false)
+  petsAllowed          Boolean @default(false)
+  partiesAllowed       Boolean @default(false)
+  childrenAllowed      Boolean @default(true)
+  minimumAge           Int?
+
+  // Booking rules — fully configurable, nothing hardcoded
+  bookingMode               BookingMode @default(INSTANT)
+  instantBooking            Boolean     @default(true)
+  minNights                 Int         @default(1)
+  maxNights                 Int?
+  minNoticeHours            Int         @default(0)
+  advanceBookingDays        Int         @default(365)
+  acceptedCheckInDays       String?     // "0,1,2,3,4,5,6" (0 = Sunday)
+  dueDiligenceEnabled       Boolean     @default(true)
+  dueDiligenceThresholdDays Int?
+  mandatoryVerification     Boolean     @default(false)
+  allowPayLater             Boolean     @default(true)
+  unpaidHoldDays            Int         @default(2) // days to hold a reservation without payment
+
+  // Display pricing snapshot
+  currency          String    @default("NGN")
+  baseNightlyRate   Float?      // minor units
+  priceBasis        RateBasis @default(NIGHTLY)
+  coverImageUrl     String?
+  featured          Boolean   @default(false)
+
+  publishedAt      DateTime?
+  submittedAt      DateTime?
+  reviewedAt       DateTime?
+  reviewedById     String?
+  rejectionReason  String?
+  adminNotes       String?
+
+  totalViews    Int    @default(0)
+  ratingAverage Float?
+  ratingCount   Int    @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  media              PropertyMedia[]
+  amenities          PropertyAmenity[]
+  categories         RoomCategory[]
+  units              Unit[]
+  reservations       Reservation[]
+  reviews            Review[]
+  savedBy            SavedProperty[]
+  inspections        InspectionRequest[]
+  verificationChecks PropertyVerificationCheck[]
+  verificationRecords VerificationRecord[]
+
+  fees               PropertyFee[]
+
+  @@index([status, isActive])
+  @@index([partnerId])
+  @@index([city, status])
+  @@index([categoryId, status])
+}
+
+model PropertyMedia {
+  id         String    @id @default(cuid())
+  propertyId String
+  property   Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  type       MediaType @default(IMAGE)
+  url        String
+  publicId   String?
+  caption    String?
+  width      Int?
+  height     Int?
+  sortOrder  Int       @default(0)
+  // Virtual tours: { provider, scenes: [{ id, name, panorama, hotspots:[{yaw,pitch,to,label}] }] }
+  meta       Json?
+  createdAt  DateTime  @default(now())
+
+  @@index([propertyId, type])
+}
+
+model PropertyAmenity {
+  id         String   @id @default(cuid())
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  amenityId  String
+  amenity    Amenity  @relation(fields: [amenityId], references: [id], onDelete: Cascade)
+  note       String?
+
+  @@unique([propertyId, amenityId])
+}
+
+model PropertyVerificationCheck {
+  id           String             @id @default(cuid())
+  propertyId   String
+  property     Property           @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  type         VerificationType
+  status       VerificationStatus @default(PENDING)
+  note         String?
+  reviewedById String?
+  completedAt  DateTime?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  @@unique([propertyId, type])
+}
+
+model VerificationRecord {
+  id           String             @id @default(cuid())
+  subjectType  String             // "USER" | "PARTNER" | "PROPERTY"
+  userId       String?
+  user         User?              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  partnerId    String?
+  partner      Partner?           @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  propertyId   String?
+  property     Property?          @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  type         VerificationType
+  provider     String?
+  providerRef  String?
+  status       VerificationStatus @default(PENDING)
+  documentUrl  String?
+  chargeMinor  Float                @default(0)
+  currency     String             @default("NGN")
+  expiresAt    DateTime?
+  submittedAt  DateTime           @default(now())
+  reviewedById String?
+  reviewedAt   DateTime?
+  notes        String?
+  metadata     Json?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  @@index([subjectType, status])
+}
+
+// -----------------------------------------------------------------------------
+// Inventory: room categories, units, pricing, availability
+// -----------------------------------------------------------------------------
+
+model RoomCategory {
+  id          String   @id @default(cuid())
+  propertyId  String
+  property    Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  name        String
+  slug        String
+  description String?
+  maxGuests   Int      @default(2)
+  bedrooms    Int      @default(1)
+  bathrooms   Int      @default(1)
+  beds        String?
+  sizeSqm     Float?
+  quantity    Int      @default(1)
+  amenities   Json?
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  units Unit[]
+
+  @@unique([propertyId, slug])
+}
+
+model Unit {
+  id          String     @id @default(cuid())
+  propertyId  String
+  property    Property   @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  categoryId  String?
+  category    RoomCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  label       String   // "Room 101", "Apartment 2B"
+  unitNumber  String?
+  floor       String?
+  maxGuests   Int      @default(2)
+  bedrooms    Int      @default(1)
+  bathrooms   Int      @default(1)
+  beds        String?
+  sizeSqm     Float?
+  status      UnitStatus @default(ACTIVE)
+  isBookable  Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  rate               UnitRate?
+  seasonalRates      SeasonalRate[]
+  availabilityBlocks AvailabilityBlock[]
+  reservationUnits   ReservationUnit[]
+  media              UnitMedia[]
+
+  @@unique([propertyId, label])
+  @@index([propertyId, status, isBookable])
+}
+
+// Media belongs to the individual unit so "see this exact room" tours work —
+// photos, floor plans, walkthrough videos and scene-based 360 tours.
+model UnitMedia {
+  id         String    @id @default(cuid())
+  unitId     String
+  unit       Unit      @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  type       MediaType @default(IMAGE)
+  url        String
+  publicId   String?
+  caption    String?
+  width      Int?
+  height     Int?
+  sortOrder  Int       @default(0)
+  // 360 tours: { provider, scenes: [{ id, name, panorama, hotspots:[{yaw,pitch,to,label}] }] }
+  meta       Json?
+  createdAt  DateTime  @default(now())
+
+  @@index([unitId, type])
+}
+
+model UnitRate {
+  id     String @id @default(cuid())
+  unitId String @unique
+  unit   Unit   @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  currency String @default("NGN")
+
+  // Partner configures only the periods relevant to them
+  nightlyRate        Float?
+  weeklyRate         Float?
+  monthlyRate        Float?
+  annualRate         Float?
+  weekendNightlyRate Float?
+
+  extraGuestFee      Float  @default(0)
+  extraGuestThreshold Int?  // guests included before the fee applies
+  cleaningFee        Float  @default(0)
+  serviceCharge      Float  @default(0)
+  securityDeposit    Float  @default(0)
+
+  minNights Int?
+  maxNights Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SeasonalRate {
+  id     String @id @default(cuid())
+  unitId String
+  unit   Unit   @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  name        String
+  startDate   DateTime @db.Date
+  endDate     DateTime @db.Date
+  nightlyRate Float?
+  weeklyRate  Float?
+  monthlyRate Float?
+  minNights   Int?
+  // Promotions surface in the "Special offers" collection
+  isPromotion Boolean  @default(false)
+  label       String?
+  priority    Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([unitId, startDate, endDate])
+}
+
+model AvailabilityBlock {
+  id          String      @id @default(cuid())
+  unitId      String
+  unit        Unit        @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  startDate   DateTime    @db.Date
+  endDate     DateTime    @db.Date
+  reason      BlockReason @default(OTHER)
+  note        String?
+  createdById String?
+  createdAt   DateTime    @default(now())
+
+  @@index([unitId, startDate, endDate])
+}
+
+// -----------------------------------------------------------------------------
+// Reservations (short stays AND long leases — same pipeline)
+// -----------------------------------------------------------------------------
+
+model Reservation {
+  id          String @id @default(cuid())
+  reference   String @unique
+  userId      String
+  user        User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  propertyId  String
+  property    Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  status      ReservationStatus @default(DRAFT)
+  bookingMode BookingMode       @default(INSTANT)
+
+  checkIn  DateTime @db.Date
+  checkOut DateTime @db.Date
+  nights   Int
+
+  adults    Int @default(1)
+  children  Int @default(0)
+  infants   Int @default(0)
+  guests    Int @default(1)
+
+  purposeOfStay   String?
+  specialRequests String?
+
+  currency   String    @default("NGN")
+  priceBasis RateBasis @default(NIGHTLY)
+
+  paymentOption ReservationPaymentOption @default(PAY_NOW)
+
+  // Money (minor units)
+  accommodationSubtotal Float @default(0)
+  extraGuestCharges     Float @default(0)
+  cleaningFee           Float @default(0)
+  serviceCharge         Float @default(0)
+  taxAmount             Float @default(0)
+  cautionAmount         Float @default(0)
+  discountAmount        Float @default(0)
+  grossAmount           Float @default(0) // total charged to customer
+  platformCommission    Float @default(0)
+  processingFee         Float @default(0)
+  partnerNetAmount      Float @default(0) // owed to the partner
+  commissionRate        Float @default(0)
+
+  promotionId String?
+  promotion   Promotion? @relation(fields: [promotionId], references: [id], onDelete: SetNull)
+
+  quote Json? // immutable price-breakdown snapshot shown to the customer
+  appliedFees Json? // snapshot of property/custom fee lines applied at booking
+
+  holdExpiresAt DateTime? // payment deadline / hold expiry; if unpaid by then the reservation is released (EXPIRED)
+  confirmedAt   DateTime?
+  approvedById  String?
+  approvedAt    DateTime?
+  declinedAt    DateTime?
+  declineReason String?
+
+  cancelledAt       DateTime?
+  cancellationReason String?
+  cancelledById     String?
+  refundAmount      Float @default(0)
+  refundedAt        DateTime?
+
+  checkedInAt    DateTime?
+  checkedInById  String?
+  checkedOutAt   DateTime?
+  checkedOutById String?
+
+  // Leasing / due diligence
+  dueDiligenceRequired Boolean @default(false)
+  dueDiligenceNote     String?
+  verifiedStay         Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  units         ReservationUnit[]
+  payments      Payment[]
+  ledgerEntries LedgerEntry[]
+  settlements   Settlement[] @relation("SettlementReservations")
+  conversations Conversation[]
+  reviews       Review[]
+  disputes      Dispute[]
+  inspections   InspectionRequest[]
+
+  @@index([userId, status])
+  @@index([propertyId, status])
+  @@index([status, createdAt])
+}
+
+model ReservationUnit {
+  id            String @id @default(cuid())
+  reservationId String
+  reservation   Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  unitId        String
+  unit          Unit   @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  checkIn  DateTime @db.Date
+  checkOut DateTime @db.Date
+  nights   Int
+  rateMinor Float     @default(0)
+  subtotal  Float     @default(0)
+
+  // Drives the DB-level no-overlap exclusion constraint. Maintained by trigger
+  // from Reservation.status — statuses that hold inventory set this true.
+  occupiesInventory Boolean @default(true)
+
+  createdAt DateTime @default(now())
+
+  @@index([unitId, checkIn, checkOut])
+  @@index([reservationId])
+}
+
+// -----------------------------------------------------------------------------
+// Money: payments, ledger, settlements
+// -----------------------------------------------------------------------------
+
+model Payment {
+  id                String           @id @default(cuid())
+  reference         String           @unique
+  provider          String           @default("PAYSTACK")
+  providerReference String?
+  direction         PaymentDirection @default(INFLOW)
+  status            PaymentStatus    @default(PENDING)
+  amount            Float              // minor units
+  currency          String           @default("NGN")
+  channel           String?
+  purpose           String           @default("BOOKING")
+  userId            String?
+  reservationId     String?
+  reservation       Reservation?     @relation(fields: [reservationId], references: [id], onDelete: SetNull)
+  authorizationCode String?
+  paidAt            DateTime?
+  failedAt          DateTime?
+  failureReason     String?
+  rawPayload        Json?
+  webhookVerified   Boolean          @default(false)
+  metadata          Json?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  ledgerEntries LedgerEntry[]
+
+  @@index([reservationId, status])
+}
+
+model LedgerEntry {
+  id            String          @id @default(cuid())
+  type          LedgerEntryType
+  direction     PaymentDirection
+  amount        Float             // minor units
+  currency      String          @default("NGN")
+  description   String?
+  reservationId String?
+  reservation   Reservation?    @relation(fields: [reservationId], references: [id], onDelete: SetNull)
+  paymentId     String?
+  payment       Payment?        @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  settlementId  String?
+  settlement    Settlement?     @relation(fields: [settlementId], references: [id], onDelete: SetNull)
+  partnerId     String?
+  externalRef   String?
+  occurredAt    DateTime        @default(now())
+  createdById   String?
+  metadata      Json?
+  createdAt     DateTime        @default(now())
+
+  @@index([type, occurredAt])
+  @@index([reservationId])
+  @@index([partnerId])
+}
+
+model Settlement {
+  id        String           @id @default(cuid())
+  reference String           @unique
+  partnerId String
+  partner   Partner          @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  status    SettlementStatus @default(PENDING)
+
+  currency String @default("NGN")
+
+  grossAmount           Float @default(0) // sum of partnerNetAmount for included stays
+  commissionDeducted    Float @default(0)
+  processingFeeDeducted Float @default(0)
+  netPayable            Float @default(0)
+  paidAmount            Float @default(0)
+
+  periodStart DateTime?
+  periodEnd   DateTime?
+  holdUntil   DateTime?
+  scheduledFor DateTime?
+  paidAt      DateTime?
+
+  bankAccountId    String?
+  bankAccountLabel String?
+  provider         String  @default("MANUAL")
+  providerReference String?
+  failureReason    String?
+  notes            String?
+  processedById    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  reservations  Reservation[] @relation("SettlementReservations")
+  ledgerEntries LedgerEntry[]
+
+  @@index([partnerId, status])
+}
+
+model Promotion {
+  id          String         @id @default(cuid())
+  code        String         @unique
+  description String?
+  type        PromotionType
+  value       Float            // percent (e.g. 15) or fixed minor units
+  scope       PromotionScope @default(ALL)
+  partnerId   String?
+  categoryId  String?
+  category    PropertyCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  propertyId  String?
+  maxDiscount Float?
+  minAmount   Float?
+  startsAt    DateTime
+  endsAt      DateTime
+  usageLimit  Int?
+  usedCount   Int            @default(0)
+  isActive    Boolean        @default(true)
+  createdById String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @default(now())
+
+  reservations Reservation[]
+
+  @@index([isActive, endsAt])
+}
+
+// -----------------------------------------------------------------------------
+// Communication
+// -----------------------------------------------------------------------------
+
+model Conversation {
+  id           String             @id @default(cuid())
+  type         ConversationType
+  status       ConversationStatus @default(OPEN)
+  subject      String?
+  propertyId   String?
+  reservationId String?
+  reservation  Reservation?       @relation(fields: [reservationId], references: [id], onDelete: SetNull)
+  customerId   String?
+  customer     User?              @relation("ConversationCustomer", fields: [customerId], references: [id], onDelete: SetNull)
+  partnerId    String?
+  partner      Partner?           @relation(fields: [partnerId], references: [id], onDelete: SetNull)
+  assignedToId String?
+  assignedTo   User?              @relation("ConversationAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  lastMessageAt DateTime          @default(now())
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  messages Message[]
+
+  @@index([partnerId, status])
+  @@index([customerId, status])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String?
+  sender         User?        @relation("MessageSender", fields: [senderId], references: [id], onDelete: SetNull)
+  isSystem       Boolean      @default(false)
+  body           String
+  attachments    Json?
+  createdAt      DateTime     @default(now())
+
+  reads MessageRead[]
+
+  @@index([conversationId, createdAt])
+}
+
+model MessageRead {
+  id        String   @id @default(cuid())
+  messageId String
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  readAt    DateTime @default(now())
+
+  @@unique([messageId, userId])
+}
+
+model Notification {
+  id        String              @id @default(cuid())
+  userId    String
+  user      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  title     String
+  body      String
+  channel   NotificationChannel @default(IN_APP)
+  status    NotificationStatus  @default(QUEUED)
+  data      Json?
+  readAt    DateTime?
+  sentAt    DateTime?
+  createdAt DateTime            @default(now())
+
+  @@index([userId, readAt])
+}
+
+model NotificationPreference {
+  id        String @id @default(cuid())
+  userId    String @unique
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  inApp     Boolean @default(true)
+  email     Boolean @default(true)
+  sms       Boolean @default(false)
+  whatsapp  Boolean @default(false)
+  updatedAt DateTime @default(now())
+}
+
+model SupportTicket {
+  id            String         @id @default(cuid())
+  reference     String         @unique
+  subject       String
+  description   String
+  category      String         @default("GENERAL")
+  status        TicketStatus   @default(OPEN)
+  priority      TicketPriority @default(MEDIUM)
+  userId        String?
+  user          User?          @relation("TicketCustomer", fields: [userId], references: [id], onDelete: SetNull)
+  email         String?
+  conversationId String?       @unique
+  assignedToId  String?
+  assignedTo    User?          @relation("TicketAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  resolution    String?
+  resolvedAt    DateTime?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@index([status, priority])
+}
+
+// -----------------------------------------------------------------------------
+// Trust: reviews, inspections, disputes, referrals
+// -----------------------------------------------------------------------------
+
+model Review {
+  id            String       @id @default(cuid())
+  propertyId    String
+  property      Property     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reservationId String?      @unique
+  reservation   Reservation? @relation(fields: [reservationId], references: [id], onDelete: SetNull)
+
+  overallRating Int
+  cleanliness   Int?
+  accuracy      Int?
+  communication Int?
+  locationRating Int?
+  value         Float?
+  checkInRating Int?
+
+  title        String?
+  body         String
+  status       ReviewStatus @default(PENDING)
+
+  partnerResponse String?
+  respondedAt     DateTime?
+  respondedById   String?
+
+  moderationNote String?
+  moderatedById  String?
+  publishedAt    DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([propertyId, status])
+}
+
+model SavedProperty {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  listName   String   @default("Favourites")
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, propertyId])
+}
+
+model InspectionRequest {
+  id            String           @id @default(cuid())
+  reference     String           @unique
+  propertyId    String
+  property      Property         @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reservationId String?
+  reservation   Reservation?     @relation(fields: [reservationId], references: [id], onDelete: SetNull)
+  status        InspectionStatus @default(REQUESTED)
+  fullName      String?
+  phone         String?
+  email         String?
+  preferredDate DateTime?
+  preferredWindow String?        // "MORNING" | "AFTERNOON" | "EVENING"
+  scheduledAt   DateTime?
+  notes         String?
+  partnerNote   String?
+  assignedToId  String?
+  completedAt   DateTime?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@index([propertyId, status])
+  @@index([userId, status])
+}
+
+model Dispute {
+  id            String        @id @default(cuid())
+  reference     String        @unique
+  reservationId String
+  reservation   Reservation   @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  openedById    String
+  openedBy      User          @relation(fields: [openedById], references: [id], onDelete: Cascade)
+  category      String        @default("OTHER")
+  reason        String
+  desiredOutcome String?
+  evidence      Json?
+  status        DisputeStatus @default(OPEN)
+  resolution    String?
+  refundAmount  Float           @default(0)
+  assignedToId  String?
+  resolvedById  String?
+  resolvedAt    DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @default(now())
+
+  @@index([status, createdAt])
+}
+
+model Referral {
+  id             String         @id @default(cuid())
+  code           String
+  referrerId     String
+  referrer       User           @relation("ReferralGiver", fields: [referrerId], references: [id], onDelete: Cascade)
+  referredUserId String?
+  referredUser   User?          @relation("ReferralReceiver", fields: [referredUserId], references: [id], onDelete: SetNull)
+  referredEmail  String?
+  status         ReferralStatus @default(PENDING)
+  rewardMinor    Float            @default(0)
+  currency       String         @default("NGN")
+  qualifiedAt    DateTime?
+  rewardedAt     DateTime?
+  createdAt      DateTime       @default(now())
+
+  @@index([referrerId, status])
+}
+
+// -----------------------------------------------------------------------------
+// Platform administration
+// -----------------------------------------------------------------------------
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  actor      User?    @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  actorEmail String?
+  actorRole  String?
+  action     String
+  entityType String
+  entityId   String?
+  summary    String?
+  before     Json?
+  after      Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([actorId, createdAt])
+}
+
+// Configurable fees set by the partner per property: tax, caution/deposit, or
+// custom lines. A VARIABLE fee stores the name only (amount supplied later).
+model PropertyFee {
+  id          String         @id @default(cuid())
+  propertyId  String
+  property    Property       @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  name        String
+  kind        FeeKind        @default(CUSTOM)
+  calculation FeeCalculation @default(FIXED)
+  amount      Float?         // minor units when FIXED
+  percentage  Float?         // when PERCENTAGE (e.g. 7.5)
+  appliesTo   FeeAppliesTo   @default(PER_STAY)
+  isRefundable Boolean       @default(false)
+  isActive    Boolean        @default(true)
+  sortOrder   Int            @default(0)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([propertyId, isActive])
+}
+
+model PlatformSetting {
+  key         String   @id
+  value       Json
+  group       String   @default("general")
+  description String?
+  updatedById String?
+  updatedAt   DateTime @updatedAt
+}
